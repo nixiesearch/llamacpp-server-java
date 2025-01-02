@@ -1,0 +1,83 @@
+name: build
+
+on:
+
+  # Manual rebuild, in case of some important upstream change
+  workflow_dispatch:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ssl: [nossl, ssl]
+        avx: [noavx, avx, avx2, avx512]
+        include:
+          - ssl: nossl
+            ssl_defines: ''
+          - ssl: ssl
+            ssl_defines: '-DLLAMA_SERVER_SSL=ON -DOPENSSL_USE_STATIC_LIBS=ON'
+          - avx: noavx
+            avx_defines: '-DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF'
+          - avx: avx
+            avx_defines: '-DGGML_AVX2=OFF'
+          - avx: avx2
+            avx_defines: ''
+          - avx: avx512
+            avx_defines: '-DGGML_AVX512=ON'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout llama.cpp
+        uses: actions/checkout@v4
+        with:
+          repository: ggerganov/llama.cpp
+          path: repo
+
+      - name: Get number of CPU cores
+        uses: SimenB/github-actions-cpu-cores@v2
+        id: cpu-cores
+
+      - name: Setup Alpine Linux
+        uses: jirutka/setup-alpine@v1
+        with:
+          packages: build-base cmake ccache git openssl-dev openssl-libs-static
+
+      - name: CMake
+        run: |
+          cmake repo -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static" -DGGML_NATIVE=OFF -DGGML_STATIC=ON -DGGML_RPC=ON -DGGML_OPENMP=OFF -DLLAMA_BUILD_SERVER=ON -DBUILD_SHARED_LIBS=OFF ${{ matrix.ssl_defines }} ${{ matrix.avx_defines }}
+          cmake --build build --config Release --target llama-server --target rpc-server -j ${{ steps.cpu-cores.outputs.count }}
+          strip build/bin/*
+        shell: alpine.sh {0}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.ssl }}-${{ matrix.avx }}
+          path: build/bin/*
+          if-no-files-found: error
+
+      - name: Build and push llama-server Docker image
+        uses: macbre/push-to-ghcr@v14
+        with:
+          dockerfile: .devops/llama-server.Dockerfile
+          context: build/bin
+          image_name: ${{ github.repository }}
+          image_tag: server-${{ matrix.ssl }}-${{ matrix.avx }}
+          github_token: ${{ secrets.GHCR_ACCESS_TOKEN }}
+          docker_io_user: ${{ vars.DOCKER_IO_USER }}
+          docker_io_token: ${{ secrets.DOCKER_IO_ACCESS_TOKEN }}
+
+      - name: Build and push rpc-server Docker image
+        uses: macbre/push-to-ghcr@v14
+        with:
+          dockerfile: .devops/rpc-server.Dockerfile
+          context: build/bin
+          image_name: ${{ github.repository }}
+          image_tag: rpc-server-${{ matrix.ssl }}-${{ matrix.avx }}
+          github_token: ${{ secrets.GHCR_ACCESS_TOKEN }}
+          docker_io_user: ${{ vars.DOCKER_IO_USER }}
+          docker_io_token: ${{ secrets.DOCKER_IO_ACCESS_TOKEN }}

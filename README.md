@@ -3,8 +3,7 @@
 A docker-based setup to build [llama-cpp](todo) binaries:
 
 * supports CUDA and CPU based builds
-* cross-build for Linux x85_64 and arm64
-* static linking enabled
+* cross-build for Linux x86_64 and arm64
 
 Used as a base for [nixiesearch/nixiesearch](https://github.com/nixiesearch/nixiesearch) embedded llamacpp-server.
 
@@ -13,7 +12,7 @@ Used as a base for [nixiesearch/nixiesearch](https://github.com/nixiesearch/nixi
 Create the build container:
 
 ```shell
-docker build -t llamacpp-build:latest --platform=x86_64 -f Dockerfile.x86_64 .
+docker build -t llamacpp-build:latest --platform=x86_64 .
 ```
 
 Build the binary without CUDA:
@@ -24,7 +23,7 @@ docker run -i -t -e "LLAMACPP_GPU=false" -v ./llama.cpp:/llama.cpp llamacpp-serv
 
 OR with CUDA:
 ```shell
-docker run -i -t -e "LLAMACPP_GPU=false" -v ./llama.cpp:/llama.cpp llamacpp-server-bin:latest
+docker run -i -t -e "LLAMACPP_GPU=true" -v ./llama.cpp:/llama.cpp llamacpp-server-bin:latest
 ```
 
 ## Binaries
