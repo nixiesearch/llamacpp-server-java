@@ -18,7 +18,7 @@ else
   OUT_DIR="/out/linux/$ARCH/cpu/"
 fi
 echo "Config done, running build..."
-cmake --build build --config Release -j12 -t llama-server
+cmake --build build --config Release -j8 -t llama-server
 
 echo "Build done, copying files to $OUT_DIR"
 mkdir -p $OUT_DIR
