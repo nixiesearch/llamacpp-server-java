@@ -2,25 +2,17 @@ package ai.nixiesearch.llamacppserver;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import java.io.*;
-import java.math.BigInteger;
 import java.nio.file.Files;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Array;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class LlamacppServer implements AutoCloseable {
     public Process process;
     public File workdir;
     public CompletableFuture<Void> logStream;
-    public CompletableFuture<Void> errorStream;
 
     private static final Logger logger = LoggerFactory.getLogger(LlamacppServer.class);
 
@@ -32,11 +24,10 @@ public class LlamacppServer implements AutoCloseable {
         GGML_CUDA12
     }
 
-    LlamacppServer(Process process, File workdir, CompletableFuture<Void> logStream, CompletableFuture<Void> errorStream) {
+    LlamacppServer(Process process, File workdir, CompletableFuture<Void> logStream) {
         this.process = process;
         this.workdir = workdir;
         this.logStream = logStream;
-        this.errorStream = errorStream;
     }
 
     public static LlamacppServer start(String[] args, LLAMACPP_BACKEND backend) throws IOException, InterruptedException {
@@ -49,7 +40,6 @@ public class LlamacppServer implements AutoCloseable {
         builder.redirectErrorStream(true);
         builder.directory(workdir);
         Process process = builder.start();
-        process.waitFor();
         CompletableFuture<Void> logStream = CompletableFuture.runAsync(() -> {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                         reader.lines().forEach(logger::info);
@@ -58,15 +48,7 @@ public class LlamacppServer implements AutoCloseable {
                     }
                 }
         );
-        CompletableFuture<Void> errorStream = CompletableFuture.runAsync(() -> {
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-                        reader.lines().forEach(logger::error);
-                    } catch (Exception e) {
-                        logger.error(e.getMessage(), e);
-                    }
-                }
-        );
-        return new LlamacppServer(process, workdir, logStream, errorStream);
+        return new LlamacppServer(process, workdir, logStream);
     }
 
     @Override
@@ -75,8 +57,6 @@ public class LlamacppServer implements AutoCloseable {
     }
 
     public void stop() throws IOException, InterruptedException, ExecutionException {
-        logStream.get();
-        errorStream.get();
         if (process.isAlive()) {
             logger.info("Stopping running llamacpp-server");
             process.destroy();
