@@ -6,7 +6,7 @@ echo "Building llama.cpp TAG=$LLAMACPP_TAG GPU=$LLAMACPP_GPU:"
 
 git clone --depth 1 --branch $LLAMACPP_TAG https://github.com/ggerganov/llama.cpp.git
 cd llama.cpp
-DEFAULT_ARGS="-DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_AVX512=OFF"
+DEFAULT_ARGS="-DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DLLAMA_CURL=ON"
 ARCH=`uname -p`
 
 
