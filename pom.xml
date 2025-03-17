@@ -4,7 +4,7 @@
 
     <groupId>ai.nixiesearch</groupId>
     <artifactId>llamacpp-server-java</artifactId>
-    <version>0.0.2-b4404</version>
+    <version>0.0.2-b4902</version>
     <packaging>jar</packaging>
 
     <name>${project.groupId}:${project.artifactId}</name>
@@ -182,7 +182,7 @@
     <properties>
         <junit.version>4.13.2</junit.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <llamacpp.tag>b4404</llamacpp.tag>
+        <llamacpp.tag>b4902</llamacpp.tag>
     </properties>
 
     <dependencies>
