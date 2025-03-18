@@ -19,7 +19,7 @@ public class LlamacppServerTest {
         Assertions.assertDoesNotThrow(() -> {
             LlamacppServer server = LlamacppServer.start(args, LlamacppServer.LLAMACPP_BACKEND.GGML_CPU);
             waitTillPortOpened(60000, 8080);
-            server.stop();
+            server.close();
         });
     }
 
