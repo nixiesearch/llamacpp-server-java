@@ -4,7 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -13,6 +18,7 @@ public class LlamacppServer implements AutoCloseable {
     public Process process;
     public File workdir;
     public CompletableFuture<Void> logStream;
+    private int port = 8080; // Default port
 
     private static final Logger logger = LoggerFactory.getLogger(LlamacppServer.class);
 
@@ -28,12 +34,23 @@ public class LlamacppServer implements AutoCloseable {
         GGML_CUDA12
     }
 
-    LlamacppServer(Process process, File workdir, CompletableFuture<Void> logStream) {
+    LlamacppServer(Process process, File workdir, CompletableFuture<Void> logStream, int port) {
         this.process = process;
         this.workdir = workdir;
         this.logStream = logStream;
+        this.port = port;
     }
 
+    /**
+     * Starts a new LlamacppServer instance with the given arguments and backend.
+     * Only one instance can be running at a time (singleton pattern).
+     * 
+     * @param args command line arguments to pass to llama-server
+     * @param backend the backend type (CPU or CUDA)
+     * @return the LlamacppServer instance
+     * @throws IOException if server startup fails
+     * @throws InterruptedException if startup is interrupted
+     */
     public synchronized static LlamacppServer start(String[] args, LLAMACPP_BACKEND backend) throws IOException, InterruptedException {
         if (!isStarted) {
             isStarted = true;
@@ -63,7 +80,8 @@ public class LlamacppServer implements AutoCloseable {
                         }
                     }
             );
-            instance = new LlamacppServer(process, workdir, logStream);
+            int port = extractPortFromArgs(args);
+            instance = new LlamacppServer(process, workdir, logStream, port);
             return instance;
         } else {
             logger.warn("Called LlamacppServer.start for the second time - it seems like a bug");
@@ -71,6 +89,59 @@ public class LlamacppServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Checks if the server is alive by verifying both process status and HTTP health endpoint.
+     * 
+     * @return true if process is running and /health endpoint returns 200
+     */
+    public boolean isAlive() {
+        return isProcessAlive() && isHealthy();
+    }
+
+    /**
+     * Checks if the underlying llama-server process is running.
+     * 
+     * @return true if the process exists and is alive
+     */
+    public boolean isProcessAlive() {
+        return process != null && process.isAlive();
+    }
+
+    /**
+     * Performs an HTTP health check against the server's /health endpoint.
+     * 
+     * @return true if the HTTP endpoint returns status 200
+     */
+    public boolean isHealthy() {
+        if (!isProcessAlive()) {
+            return false;
+        }
+        
+        try {
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(2))
+                    .build();
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:" + port + "/health"))
+                    .timeout(Duration.ofSeconds(2))
+                    .GET()
+                    .build();
+            
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            logger.debug("Health check failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Stops the server process and cleans up all resources including temporary files.
+     * This method is thread-safe and can be called multiple times safely.
+     * 
+     * @throws Exception if shutdown fails
+     */
     @Override
     public synchronized void close() throws Exception {
         if (isStarted) {
@@ -146,6 +217,19 @@ public class LlamacppServer implements AutoCloseable {
             }
         }
         return workdir;
+    }
+
+    private static int extractPortFromArgs(String[] args) {
+        for (int i = 0; i < args.length - 1; i++) {
+            if ("--port".equals(args[i]) || "-p".equals(args[i])) {
+                try {
+                    return Integer.parseInt(args[i + 1]);
+                } catch (NumberFormatException e) {
+                    logger.warn("Invalid port number in args: {}", args[i + 1]);
+                }
+            }
+        }
+        return 8080; // Default port
     }
 
     private static void unpackResourceList(File workdir, String resourceDir, String[] resourcePaths) throws IOException {
