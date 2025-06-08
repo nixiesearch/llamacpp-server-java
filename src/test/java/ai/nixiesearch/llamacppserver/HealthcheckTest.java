@@ -10,7 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-public class LlamacppServerHealthTest {
+public class HealthcheckTest {
 
     private int findAvailablePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {

@@ -9,7 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-public class LlamacppServerTest {
+public class ServerTest {
     @Test
     void testUnpack() {
         String[] args = {
