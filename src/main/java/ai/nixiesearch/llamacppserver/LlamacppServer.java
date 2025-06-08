@@ -49,11 +49,17 @@ public class LlamacppServer implements AutoCloseable {
             CompletableFuture<Void> logStream = CompletableFuture.runAsync(() -> {
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                             String line;
-                            while ((line = reader.readLine()) != null) {
+                            while (process.isAlive() && (line = reader.readLine()) != null) {
                                 logger.info(line);
                             }
+                        } catch (IOException e) {
+                            if (process.isAlive()) {
+                                logger.error("Log stream error: {}", e.getMessage(), e);
+                            } else {
+                                logger.debug("Log stream closed during shutdown: {}", e.getMessage());
+                            }
                         } catch (Exception e) {
-                            logger.error(e.getMessage(), e);
+                            logger.error("Unexpected error in log stream: {}", e.getMessage(), e);
                         }
                     }
             );
@@ -86,11 +92,26 @@ public class LlamacppServer implements AutoCloseable {
         if (process.isAlive()) {
             logger.info("Waiting for running llamacpp-server to stop...");
             process.destroy();
-            process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
-            logStream.get();
+            boolean exited = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            if (!exited) {
+                logger.warn("Process did not exit gracefully, forcing termination");
+                process.destroyForcibly();
+                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            
+            try {
+                logStream.get(2, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                logger.debug("Log stream did not complete within timeout, continuing shutdown");
+            }
             logger.info("llamacpp-server stopped");
         } else {
             logger.info("llamacpp-server is already stopped");
+            try {
+                logStream.get(1, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                logger.debug("Log stream cleanup timeout, continuing");
+            }
         }
 
     }
