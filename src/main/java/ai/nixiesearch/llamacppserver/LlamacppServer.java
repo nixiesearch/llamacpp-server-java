@@ -16,8 +16,8 @@ public class LlamacppServer implements AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(LlamacppServer.class);
 
-    private static String[] CPU_LIBS = {"libggml.so", "libggml-base.so", "libggml-cpu.so", "libllama.so", "llama-server"};
-    private static String[] CUDA_LIBS = {"libggml.so", "libggml-base.so", "libggml-cpu.so", "libggml-cuda.so", "libllama.so", "llama-server"};
+    private static String[] CPU_LIBS = {"libggml.so", "libggml-base.so", "libggml-cpu.so", "libllama.so", "llama-server", "libmtmd.so"};
+    private static String[] CUDA_LIBS = {"libggml.so", "libggml-base.so", "libggml-cpu.so", "libggml-cuda.so", "libllama.so", "llama-server", "libmtmd.so"};
 
     volatile private static boolean isStarted = false;
     private static LlamacppServer instance = null;
@@ -84,8 +84,11 @@ public class LlamacppServer implements AutoCloseable {
 
     private void stop() throws IOException, InterruptedException, ExecutionException {
         if (process.isAlive()) {
-            logger.info("Stopping running llamacpp-server");
+            logger.info("Waiting for running llamacpp-server to stop...");
             process.destroy();
+            process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            logStream.get();
+            logger.info("llamacpp-server stopped");
         } else {
             logger.info("llamacpp-server is already stopped");
         }
