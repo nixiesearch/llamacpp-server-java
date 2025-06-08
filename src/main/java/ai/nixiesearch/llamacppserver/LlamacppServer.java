@@ -71,7 +71,7 @@ public class LlamacppServer implements AutoCloseable {
                             }
                         } catch (IOException e) {
                             if (process.isAlive()) {
-                                logger.error("Log stream error: {}", e.getMessage(), e);
+                                logger.error("Log stream error: {}", e.getMessage());
                             } else {
                                 logger.debug("Log stream closed during shutdown: {}", e.getMessage());
                             }
